@@ -53,6 +53,8 @@
 -export([urlencode/2]).
 -export([x_www_form_urlencoded/1]).
 
+-export([cookie_name/2, cookie_value/2, cookie/2]).
+
 %% Parsing.
 
 %% @doc Parse a non-empty list of the given type.
@@ -112,7 +114,9 @@ cookie_list(Data, Acc) ->
 			(<< $,, Rest/binary >>) -> cookie_list(Rest, Acc);
 			(<< $;, Rest/binary >>) -> cookie_list(Rest, Acc);
 			(Rest) -> cookie(Rest,
-				fun (Rest2, << $$, _/binary >>, _) ->
+				fun (Rest2, <<>>, <<>>) ->
+						cookie_list(Rest2, Acc);
+					(Rest2, << $$, _/binary >>, _) ->
 						cookie_list(Rest2, Acc);
 					(Rest2, Name, Value) ->
 						cookie_list(Rest2, [{Name, Value}|Acc])
@@ -124,15 +128,16 @@ cookie(Data, Fun) ->
 	whitespace(Data,
 		fun (Rest) ->
 				cookie_name(Rest,
-					fun (_Rest2, <<>>) -> {error, badarg};
+					fun (Rest2, <<>>) -> Fun(Rest2, <<>>, <<>>);
 						(<< $=, Rest2/binary >>, Name) ->
 							cookie_value(Rest2,
 								fun (Rest3, Value) ->
 										Fun(Rest3, Name, Value)
 								end);
-						(_Rest2, _Attr) -> {error, badarg}
+						(Rest2, _Attr) -> Fun(Rest2, <<>>, <<>>)
 					end)
 		end).
+
 
 -spec cookie_name(binary(), fun()) -> any().
 cookie_name(Data, Fun) ->
